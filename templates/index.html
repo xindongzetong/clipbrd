@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>网页剪切板</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background: #f3f4f6;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            margin: 0;
+            padding: 10px;
+        }
+        .container {
+            background: #fff;
+            padding: 20px;
+            border-radius: 12px;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+            width: 100%;
+            max-width: 500px;
+        }
+        h2 {
+            margin-top: 0;
+            text-align: center;
+        }
+        textarea {
+            width: 100%;
+            min-height: 120px;
+            border-radius: 8px;
+            border: 1px solid #ccc;
+            padding: 10px;
+            font-size: 16px;
+            resize: vertical;
+            margin-bottom: 12px;
+            box-sizing: border-box;
+        }
+        .btn-group {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            justify-content: center;
+        }
+        button {
+            flex: 1;
+            min-width: 100px;
+            background: #3b82f6;
+            color: white;
+            border: none;
+            padding: 12px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 15px;
+            transition: background 0.2s;
+        }
+        button:hover {
+            background: #2563eb;
+        }
+        @media (max-width: 480px) {
+            textarea {
+                font-size: 14px;
+                min-height: 100px;
+            }
+            button {
+                font-size: 14px;
+                padding: 10px;
+            }
+        }
+        /* toast 提示样式 */
+        .toast {
+            position: fixed;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(60, 64, 67, 0.9);
+            color: #fff;
+            padding: 10px 20px;
+            border-radius: 8px;
+            font-size: 14px;
+            opacity: 0;
+            transition: opacity 0.3s ease;
+            pointer-events: none;
+            z-index: 9999;
+        }
+        .toast.show {
+            opacity: 1;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h2>📋 网页剪切板</h2>
+        <textarea id="clipboard"></textarea>
+        <div class="btn-group">
+            <button onclick="saveContent()">保存</button>
+            <button onclick="copyContent()">复制</button>
+        </div>
+    </div>
+
+    <div id="toast" class="toast"></div>
+
+    <script>
+        async function loadContent() {
+            let res = await fetch("/get");
+            let data = await res.json();
+            document.getElementById("clipboard").value = data.text;
+        }
+
+        async function saveContent() {
+            let text = document.getElementById("clipboard").value;
+            await fetch("/set", {
+                method: "POST",
+                headers: {"Content-Type": "application/json"},
+                body: JSON.stringify({text: text})
+            });
+            showToast("内容已保存 ✅");
+        }
+
+        function copyContent() {
+            let textarea = document.getElementById("clipboard");
+            textarea.select();
+            document.execCommand("copy");
+            showToast("已复制到剪贴板 ✅");
+        }
+
+        function showToast(message) {
+            const toast = document.getElementById("toast");
+            toast.textContent = message;
+            toast.classList.add("show");
+            setTimeout(() => {
+                toast.classList.remove("show");
+            }, 3000);
+        }
+
+
+        loadContent();
+    </script>
+</body>
+</html>
