@@ -3,110 +3,70 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>网页剪切板</title>
+    <title>增强型网页剪切板</title>
     <style>
-        body {
-            font-family: Arial, sans-serif;
-            background: #f3f4f6;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            min-height: 100vh;
-            margin: 0;
-            padding: 10px;
-        }
-        .container {
-            background: #fff;
-            padding: 20px;
-            border-radius: 12px;
-            box-shadow: 0 4px 10px rgba(0,0,0,0.1);
-            width: 100%;
-            max-width: 500px;
-        }
-        h2 {
-            margin-top: 0;
-            text-align: center;
-        }
-        textarea {
-            width: 100%;
-            min-height: 120px;
-            border-radius: 8px;
-            border: 1px solid #ccc;
-            padding: 10px;
-            font-size: 16px;
-            resize: vertical;
-            margin-bottom: 12px;
-            box-sizing: border-box;
-        }
-        .btn-group {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 10px;
-            justify-content: center;
-        }
-        button {
-            flex: 1;
-            min-width: 100px;
-            background: #3b82f6;
-            color: white;
-            border: none;
-            padding: 12px;
-            border-radius: 8px;
-            cursor: pointer;
-            font-size: 15px;
-            transition: background 0.2s;
-        }
-        button:hover {
-            background: #2563eb;
-        }
-        @media (max-width: 480px) {
-            textarea {
-                font-size: 14px;
-                min-height: 100px;
-            }
-            button {
-                font-size: 14px;
-                padding: 10px;
-            }
-        }
-        /* toast 提示样式 */
-        .toast {
-            position: fixed;
-            bottom: 20px;
-            left: 50%;
-            transform: translateX(-50%);
-            background: rgba(60, 64, 67, 0.9);
-            color: #fff;
-            padding: 10px 20px;
-            border-radius: 8px;
-            font-size: 14px;
-            opacity: 0;
-            transition: opacity 0.3s ease;
-            pointer-events: none;
-            z-index: 9999;
-        }
-        .toast.show {
-            opacity: 1;
-        }
+        body { font-family: Arial, sans-serif; background: #f3f4f6; display: flex; justify-content: center; align-items: center; min-height: 100vh; margin: 0; padding: 10px; }
+        .container { background: #fff; padding: 20px; border-radius: 12px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); width: 100%; max-width: 500px; }
+        h2 { margin-top: 0; text-align: center; }
+        textarea { width: 100%; min-height: 120px; border-radius: 8px; border: 1px solid #ccc; padding: 10px; font-size: 16px; resize: vertical; margin-bottom: 12px; box-sizing: border-box; }
+
+        /* 文件上传区域样式 */
+        .file-area { margin: 15px 0; padding: 10px; border-top: 1px solid #eee; border-bottom: 1px solid #eee; text-align: center; font-size: 14px; color: #666; }
+        .file-area a { color: #3b82f6; text-decoration: none; cursor: pointer; }
+
+        .btn-group { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; margin-top: 10px; }
+        button { flex: 1; min-width: 100px; background: #3b82f6; color: white; border: none; padding: 12px; border-radius: 8px; cursor: pointer; font-size: 15px; transition: background 0.2s; }
+        button:hover { background: #2563eb; }
+
+        /* 清除按钮样式（红色） */
+        .btn-clear { background: #ef4444; }
+        .btn-clear:hover { background: #dc2626; }
+
+        /* Toast 提示样式 */
+        .toast { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); background: rgba(60, 64, 67, 0.9); color: #fff; padding: 10px 20px; border-radius: 8px; font-size: 14px; opacity: 0; transition: opacity 0.3s ease; pointer-events: none; z-index: 9999; }
+        .toast.show { opacity: 1; }
     </style>
 </head>
 <body>
     <div class="container">
-        <h2>📋 网页剪切板</h2>
-        <textarea id="clipboard"></textarea>
+        <h2>📋 增强型剪切板</h2>
+
+        <textarea id="clipboard" placeholder="输入内容将自动保存..."></textarea>
+
+        <!-- 文件功能区域 -->
+        <div class="file-area">
+            <input type="file" id="fileInput" style="display: none;" onchange="uploadSelectedFile()">
+            <div id="fileStatus">未选择文件</div>
+            <button onclick="document.getElementById('fileInput').click()" style="width: auto; margin: 5px 0;">📂 选择文件</button>
+        </div>
+
+        <!-- 按钮组 -->
         <div class="btn-group">
-            <button onclick="saveContent()">保存</button>
-            <button onclick="copyContent()">复制</button>
+            <button onclick="copyContent()">📋 复制文本</button>
+            <button onclick="downloadFile()" id="downloadBtn" disabled>⬇️ 下载文件</button>
+            <button onclick="clearAll()" class="btn-clear">🗑️ 清除所有</button>
         </div>
     </div>
 
     <div id="toast" class="toast"></div>
 
     <script>
+        // --- 自动保存防抖逻辑 ---
+        let saveTimeout;
+        document.getElementById('clipboard').addEventListener('input', function() {
+            // 每次输入时，先清除之前的定时器
+            clearTimeout(saveTimeout);
+            // 设置新的定时器，用户停止输入 1 秒后触发保存
+            saveTimeout = setTimeout(saveContent, 1000);
+        });
+
         async function loadContent() {
             let res = await fetch("/get");
             let data = await res.json();
             document.getElementById("clipboard").value = data.text;
+
+            // 根据后端返回的状态更新 UI
+            updateFileUI(data.has_file);
         }
 
         async function saveContent() {
@@ -116,9 +76,67 @@
                 headers: {"Content-Type": "application/json"},
                 body: JSON.stringify({text: text})
             });
-            showToast("内容已保存 ✅");
+            // showToast("内容已保存 ✅"); // 自动保存不需要频繁提示
         }
 
+        // --- 文件上传逻辑 ---
+        async function uploadSelectedFile() {
+            const fileInput = document.getElementById('fileInput');
+            const file = fileInput.files[0];
+            if (!file) return;
+
+            const formData = new FormData();
+            formData.append('file', file);
+
+            try {
+                const res = await fetch('/upload', {
+                    method: 'POST',
+                    body: formData
+                });
+                const result = await res.json();
+
+                if (result.success) {
+                    showToast(`文件 "${result.filename}" 上传成功 ✅`);
+                    updateFileUI(true); // 更新 UI 显示可以下载
+                } else {
+                    showToast("文件上传失败 ❌");
+                }
+            } catch (error) {
+                showToast("上传出错: " + error.message);
+            }
+        }
+
+        // --- 文件下载逻辑 ---
+        function downloadFile() {
+            // 直接跳转到下载链接
+            window.location.href = '/download';
+        }
+
+        // --- 清除功能 ---
+        async function clearAll() {
+            if (!confirm("确定要清空所有文本和文件吗？")) return;
+
+            await fetch("/clear", { method: "POST" });
+            document.getElementById("clipboard").value = "";
+            updateFileUI(false);
+            showToast("已清空所有内容 🗑️");
+        }
+
+        // --- 辅助函数：更新文件相关的 UI 状态 ---
+        function updateFileUI(hasFile) {
+            const downloadBtn = document.getElementById('downloadBtn');
+            const fileStatus = document.getElementById('fileStatus');
+
+            if (hasFile) {
+                downloadBtn.disabled = false;
+                fileStatus.textContent = "文件已准备好下载";
+            } else {
+                downloadBtn.disabled = true;
+                fileStatus.textContent = "未选择文件";
+            }
+        }
+
+        // --- 通用函数：复制文本 ---
         function copyContent() {
             let textarea = document.getElementById("clipboard");
             textarea.select();
@@ -126,16 +144,15 @@
             showToast("已复制到剪贴板 ✅");
         }
 
+        // --- Toast 提示 ---
         function showToast(message) {
             const toast = document.getElementById("toast");
             toast.textContent = message;
             toast.classList.add("show");
-            setTimeout(() => {
-                toast.classList.remove("show");
-            }, 3000);
+            setTimeout(() => { toast.classList.remove("show"); }, 3000);
         }
 
-
+        // 页面加载时初始化
         loadContent();
     </script>
 </body>
